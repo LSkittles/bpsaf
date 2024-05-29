@@ -1,0 +1,144 @@
+// 对基于VEX IR与RTL生成的Facts进行分类：
+// Type_1. 两边均出现且表达式展开完全相同的
+// Type_2. 两边均出现但表达式展开不相同（regname与addr_eid仍要求完全相同） // 按理addr_eid逻辑上相同就可以，但暂时不想管那么多了
+// Type_3. 只有一边出现的
+
+// 依据VEX IR实现的数据库
+.decl put_reg_vex(instruction_addr:number, order:number, size_bit:number, data_eid:symbol, reg_eid:symbol)
+.decl store_mem_vex(instruction_addr:number, order:number, size_byte:number, data_eid:symbol, mem_eid:symbol, endness:symbol)
+// .decl exit_vex()
+.decl regname_vex_exp(eid:symbol, regname:symbol)
+.decl mem_vex_exp(eid:symbol, size_byte:number, addr_eid:symbol, endness:symbol)
+.decl const_vex_exp(eid:symbol, size_bit:number, value:symbol)
+// .decl unop_vex_exp()
+.decl binop_vex_exp(eid:symbol, size_bit:number, binop:symbol, exp_l:symbol, exp_r:symbol)
+// .decl ite_vex_exp()
+
+.input regname_vex_exp
+.input mem_vex_exp
+.input const_vex_exp
+.input binop_vex_exp
+.input put_reg_vex
+.input store_mem_vex
+
+
+// 依据RTL实现的数据库
+.decl arith_rtl_exp(eid:symbol, size_bit:number, bvec:symbol, exp_l:symbol, exp_r:symbol)
+.decl get_loc_rtl_exp(eid:symbol, regname:symbol)
+.decl get_mem_rtl_exp(eid:symbol, size_byte:number, addr_eid:symbol)
+.decl imm_rtl_exp(eid:symbol, size_bit:number, value:symbol)
+.decl set_loc_rtl(instruction_addr:number, order:number, size_bit:number, data_eid:symbol, loc_eid:symbol)
+.decl set_mem_rtl(instruction_addr:number, order:number, size_byte:number, data_eid:symbol, mem_eid:symbol)
+
+.input arith_rtl_exp
+.input get_loc_rtl_exp
+.input get_mem_rtl_exp
+.input imm_rtl_exp
+.input set_loc_rtl
+.input set_mem_rtl
+
+.decl refined_set_loc_rtl(instruction_addr:number, order:number, size_bit:number, data_eid:symbol, loc_eid:symbol)
+.decl refined_set_mem_rtl(instruction_addr:number, order:number, size_byte:number, data_eid:symbol, mem_eid:symbol)
+.input refined_set_loc_rtl
+.input refined_set_mem_rtl
+
+
+// VEX IR与RTL实现的运算符形式并不相同，手动添加一个equalOP表
+.decl equalOP(vex_op:symbol, rtl_op:symbol)
+.input equalOP
+
+
+// 计算等价的表达式
+.decl equalEXP(vex_eid:symbol, rtl_eid:symbol)
+.output equalEXP(filename="equalEXP.facts")
+
+equalEXP(vex_eid, rtl_eid) :-
+    const_vex_exp(vex_eid, size, value),
+    imm_rtl_exp(rtl_eid, size, value).
+
+equalEXP(vex_eid, rtl_eid) :-
+    regname_vex_exp(vex_eid, regname),
+    get_loc_rtl_exp(rtl_eid, regname).
+
+equalEXP(vex_eid, rtl_eid) :-
+    mem_vex_exp(vex_eid, size_byte, vex_addr_eid, _),
+    get_mem_rtl_exp(rtl_eid, size_byte, rtl_addr_eid),
+    equalEXP(vex_addr_eid, rtl_addr_eid).
+
+equalEXP(vex_eid, rtl_eid) :-
+    binop_vex_exp(vex_eid, size, vex_op, vex_l, vex_r),
+    arith_rtl_exp(rtl_eid, size, rtl_op, rtl_l, rtl_r),
+    equalOP(vex_op, rtl_op),
+    equalEXP(vex_l, rtl_l),
+    equalEXP(vex_r, rtl_r).
+
+
+// 写寄存器指令
+// 第一类
+// 两类中均出现，且表达式展开相同
+.decl Type_1_put_reg(instruction_addr:number, size_bit:number, vex_reg_eid:symbol, rtl_loc_sid:symbol)
+.output Type_1_put_reg(filename="Type_1_put_reg.facts")
+Type_1_put_reg(instruction_addr, size_bit, vex_reg_eid, rtl_loc_eid) :-
+    put_reg_vex(instruction_addr, _, size_bit, vex_data_eid, vex_reg_eid),
+    refined_set_loc_rtl(instruction_addr, _, size_bit, rtl_data_eid, rtl_loc_eid),
+    equalEXP(vex_data_eid, rtl_data_eid),
+    equalEXP(vex_reg_eid, rtl_loc_eid).
+// 第二类
+// 两类中均出现，但表达式展开不同
+.decl Type_2_put_reg(instruction_addr:number, size_bit:number, vex_data_eid:symbol, vex_reg_eid:symbol, rtl_data_eid:symbol, rtl_loc_eid:symbol)
+.output Type_2_put_reg(filename="Type_2_put_reg.facts")
+Type_2_put_reg(instruction_addr, size_bit, vex_data_eid, vex_reg_eid, rtl_data_eid, rtl_loc_eid) :-
+    put_reg_vex(instruction_addr, _, size_bit, vex_data_eid, vex_reg_eid),
+    refined_set_loc_rtl(instruction_addr, _, size_bit, rtl_data_eid, rtl_loc_eid),
+    equalEXP(vex_reg_eid, rtl_loc_eid),
+    !Type_1_put_reg(instruction_addr, size_bit, vex_reg_eid, rtl_loc_eid).
+// 第三类
+// A型：只在VEX中出现
+.decl Type_3_put_reg_vex(instruction_addr:number, size_bit:number, vex_data_eid:symbol, vex_reg_eid:symbol)
+.output Type_3_put_reg_vex(filename="Type_3_put_reg_vex.facts")
+Type_3_put_reg_vex(instruction_addr, size_bit, vex_data_eid, vex_reg_eid) :-
+    put_reg_vex(instruction_addr, _, size_bit, vex_data_eid, vex_reg_eid),
+    !Type_1_put_reg(instruction_addr, size_bit, vex_reg_eid, _),
+    !Type_2_put_reg(instruction_addr, size_bit, vex_data_eid, vex_reg_eid, _, _).
+// B型：只在RTl中出现
+.decl Type_3_put_reg_rtl(instruction_addr:number, size_bit:number, rtl_data_eid:symbol, rtl_loc_eid:symbol)
+.output Type_3_put_reg_rtl(filename="Type_3_put_reg_rtl.facts")
+Type_3_put_reg_rtl(instruction_addr, size_bit, rtl_data_eid, rtl_loc_eid) :-
+    refined_set_loc_rtl(instruction_addr, _, size_bit, rtl_data_eid, rtl_loc_eid),
+    !Type_1_put_reg(instruction_addr, size_bit, _, rtl_loc_eid),
+    !Type_2_put_reg(instruction_addr, size_bit, _, _, rtl_data_eid, rtl_loc_eid).
+
+// 写内存指令
+// 第一类
+// 两类中均出现，且表达式展开相同
+.decl Type_1_store_mem(instruction_addr:number, size_byte:number, vex_addr_eid:symbol, rtl_addr_eid:symbol)
+.output Type_1_store_mem(filename="Type_1_store_mem.facts")
+Type_1_store_mem(instruction_addr, size_byte, vex_addr_eid, rtl_addr_eid) :-
+    store_mem_vex(instruction_addr, _, size_byte, vex_data_eid, vex_addr_eid, _),
+    refined_set_mem_rtl(instruction_addr, _, size_byte, rtl_data_eid, rtl_addr_eid),
+    equalEXP(vex_data_eid, rtl_data_eid),
+    equalEXP(vex_addr_eid, rtl_addr_eid).
+// 第二类
+// 两类中均出现，但表达式展开不同
+.decl Type_2_store_mem(instruction_addr:number, size_byte:number, vex_data_eid:symbol, vex_addr_eid:symbol, rtl_data_eid:symbol, rtl_addr_eid:symbol)
+.output Type_2_store_mem(filename="Type_2_store_mem.facts")
+Type_2_store_mem(instruction_addr, size_byte, vex_data_eid, vex_addr_eid, rtl_data_eid, rtl_addr_eid) :-
+    store_mem_vex(instruction_addr, _, size_byte, vex_data_eid, vex_addr_eid, _),
+    refined_set_mem_rtl(instruction_addr, _, size_byte, rtl_data_eid, rtl_addr_eid),
+    equalEXP(vex_addr_eid, rtl_addr_eid),
+    !Type_1_store_mem(instruction_addr, size_byte, vex_addr_eid, rtl_addr_eid).
+// 第三类
+// A型：只在VEX中出现
+.decl Type_3_store_mem_vex(instruction_addr:number, size_byte:number, vex_data_eid:symbol, vex_addr_eid:symbol)
+.output Type_3_store_mem_vex(filename="Type_3_store_mem_vex.facts")
+Type_3_store_mem_vex(instruction_addr, size_byte, vex_data_eid, vex_addr_eid) :-
+    store_mem_vex(instruction_addr, _, size_byte, vex_data_eid, vex_addr_eid, _),
+    !Type_1_store_mem(instruction_addr, size_byte, vex_addr_eid, _),
+    !Type_2_store_mem(instruction_addr, size_byte, vex_data_eid, vex_addr_eid, _, _).
+// B型：只在RTL中出现
+.decl Type_3_store_mem_rtl(instruction_addr:number, size_byte:number, rtl_data_eid:symbol, rtl_addr_eid:symbol)    
+.output Type_3_store_mem_rtl(filename="Type_3_store_mem_rtl.facts")
+Type_3_store_mem_rtl(instruction_addr, size_byte, rtl_data_eid, rtl_addr_eid) :-
+    refined_set_mem_rtl(instruction_addr, _, size_byte, rtl_data_eid, rtl_addr_eid),
+    !Type_1_store_mem(instruction_addr, size_byte, _, rtl_addr_eid),
+    !Type_2_store_mem(instruction_addr, size_byte, _, _, rtl_data_eid, rtl_addr_eid).

@@ -1,0 +1,42 @@
+.decl arith_rtl_exp(eid:symbol, size_bit:number, bvec:symbol, exp_l:symbol, exp_r:symbol)
+.decl get_loc_rtl_exp(eid:symbol, regname:symbol)
+.decl get_mem_rtl_exp(eid:symbol, size_byte:number, data_eid:symbol)
+.decl imm_rtl_exp(eid:symbol, size_bit:number, value:number)
+.decl set_loc_rtl(instruction_addr:number, order:number, size_bit:number, data_eid:symbol, loc_eid:symbol)
+.decl set_mem_rtl(instruction_addr:number, order:number, size_byte:number, data_eid:symbol, mem_eid:symbol)
+
+.input arith_rtl_exp
+.input get_loc_rtl_exp
+.input get_mem_rtl_exp
+.input imm_rtl_exp
+.input set_loc_rtl
+.input set_mem_rtl
+
+// 已有的六个表并不完整，有些表达式无法完整复原，全部丢掉
+// perfectEXP指可以完整复原语法树的表达式EXP
+.decl perfectEXP(eid:symbol)
+.output perfectEXP(filename="perfectEXP.facts")
+
+perfectEXP(X) :- imm_rtl_exp(X, _, _).
+perfectEXP(X) :- get_loc_rtl_exp(X, _).
+perfectEXP(X) :- get_mem_rtl_exp(X, _, Y), perfectEXP(Y).
+perfectEXP(X) :- arith_rtl_exp(X, _, _, Y, Z), perfectEXP(Y), perfectEXP(Z).
+
+
+// 若操作数中含有不完整的表达式，则从表中删除
+// 另外也把地址加上base基址0x8048000=134512640
+.decl refined_set_loc_rtl(instruction_addr:number, order:number, size_bit:number, data_eid:symbol, loc_eid:symbol)
+.output refined_set_loc_rtl(filename="refined_set_loc_rtl.facts")
+
+refined_set_loc_rtl(addr+134512640, order, size_bit, data_eid, loc_eid) :-
+    set_loc_rtl(addr, order, size_bit, data_eid, loc_eid),
+    perfectEXP(data_eid),
+    perfectEXP(loc_eid).
+
+.decl refined_set_mem_rtl(instruction_addr:number, order:number, size_byte:number, data_eid:symbol, mem_eid:symbol)
+.output refined_set_mem_rtl(filename="refined_set_mem_rtl.facts")
+
+refined_set_mem_rtl(addr+134512640, order, size_byte, data_eid, mem_eid) :-
+    set_mem_rtl(addr, order, size_byte, data_eid, mem_eid),
+    perfectEXP(data_eid),
+    perfectEXP(mem_eid).
