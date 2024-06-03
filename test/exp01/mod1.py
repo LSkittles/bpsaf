@@ -9,6 +9,8 @@ import time
 import angr
 import pickle
 
+import pandas as pd
+
 from flatten import flatten_log
 from compare import compareVEX
 
@@ -32,19 +34,19 @@ for arch in archlist:
         
         binary_file = os.path.join(binary_dir, arch, binary_name)
         
-        # cfg_start_time = time.time()
-        # # 生成cfg
-        # # 创建cfg文件夹
-        # if not os.path.exists(os.path.join(cfg_pickle_dir, arch)):
-        #     os.makedirs(os.path.join(cfg_pickle_dir, arch))
-        # proj = angr.Project(binary_file, load_options={'auto_load_libs': False})
-        # cfg = proj.analyses.CFGFast()
-        # # 序列化保存入硬盘中
-        # cfg_file_path = os.path.join(cfg_pickle_dir, arch, binary_name) + ".cfg-pickle"
-        # with open(cfg_file_path, "wb") as cfg_file:
-        #     pickle.dump(cfg, cfg_file)
-        # cfg_end_time = time.time()
-        # cfg_time = cfg_end_time - cfg_start_time
+        cfg_start_time = time.time()
+        # 生成cfg
+        # 创建cfg文件夹
+        if not os.path.exists(os.path.join(cfg_pickle_dir, arch)):
+            os.makedirs(os.path.join(cfg_pickle_dir, arch))
+        proj = angr.Project(binary_file, load_options={'auto_load_libs': False})
+        cfg = proj.analyses.CFGFast()
+        # 序列化保存入硬盘中
+        cfg_file_path = os.path.join(cfg_pickle_dir, arch, binary_name) + ".cfg-pickle"
+        with open(cfg_file_path, "wb") as cfg_file:
+            pickle.dump(cfg, cfg_file)
+        cfg_end_time = time.time()
+        cfg_time = cfg_end_time - cfg_start_time
         
         facts_start_time = time.time()
         # 生成Datalog事实
@@ -56,3 +58,8 @@ for arch in archlist:
         writeFacts(facts, os.path.join(facts_dir, arch, binary_name))
         facts_end_time = time.time()
         facts_time = facts_end_time - facts_start_time
+        
+        time_list.append((arch, binary_name, cfg_time, facts_time))
+        
+
+pd.DataFrame(time_list).to_csv("time_consume.csv")

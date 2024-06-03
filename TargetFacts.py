@@ -60,3 +60,6 @@ class TargetFacts:
         # tmp_vex_exp(eid, tmp_size, irsb_addr, tmp)
         # key=(irsb_addr, tmp), value=(eid, tmp_size)
         self.tmp_vex_exp = {}
+        
+        # 仅用于pretty print
+        self.bin_cfg = {}

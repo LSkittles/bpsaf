@@ -305,6 +305,8 @@ def IRSB2Facts(irsb:pyvex.IRSB, facts:TargetFacts, eid_iter):
     '''
     stmts = irsb.statements
     irsb_addr = irsb.addr
+    if irsb_addr not in facts.bin_cfg.keys():
+        facts.bin_cfg[irsb_addr] = []
     instruction_addr = 0
     ir_order = 0
 
@@ -315,6 +317,7 @@ def IRSB2Facts(irsb:pyvex.IRSB, facts:TargetFacts, eid_iter):
         if stmt.tag == 'Ist_IMark':
             ir_order = 0
             instruction_addr = stmt.addr
+            facts.bin_cfg[irsb_addr].append(instruction_addr)
         elif stmt.tag == 'Ist_Put':
             ir_order += 1
             stmt_Put(irsb_addr, instruction_addr, ir_order, stmt, facts, eid_iter)

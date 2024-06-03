@@ -143,6 +143,8 @@ def writeFacts(facts:TargetFacts, target_dir):
     
     # arch也序列化保存一份，pretty print用
     pickle.dump(facts.arch, file=open(os.path.join(target_dir, "bin_arch.pickle"), "wb"))
+    # bin_cfg
+    pickle.dump(facts.bin_cfg, file=open(os.path.join(target_dir, "bin_cfg.pickle"), "wb"))
 
 
 def printVEXIR(binary_path, cfg_dir=None, out=sys.__stdout__):

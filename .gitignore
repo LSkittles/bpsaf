@@ -144,3 +144,4 @@ cython_debug/
 /tmp/output/
 /benchmark/others/
 *.cfg-pickle
+*.pickle

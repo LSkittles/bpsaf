@@ -53,9 +53,4 @@ class tempFacts:
         # exit_vex(addr, order, guard, dst, jumpkind, offsIP)
         self.exit_vex = []
         
-        # 以后为辅助pretty print用
-        # 用于存放程序的cfg
-        # key=block的addr, value=block中指令的addr
         self.bin_cfg = {}
-        
-        self.reg_dicts = {}
